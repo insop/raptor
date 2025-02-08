@@ -3,7 +3,7 @@ import pickle
 
 from .cluster_tree_builder import ClusterTreeBuilder, ClusterTreeConfig
 from .EmbeddingModels import BaseEmbeddingModel
-from .QAModels import BaseQAModel, GPT3TurboQAModel
+from .QAModels import BaseQAModel, GPT4oQAModel
 from .SummarizationModels import BaseSummarizationModel
 from .tree_builder import TreeBuilder, TreeBuilderConfig
 from .tree_retriever import TreeRetriever, TreeRetrieverConfig
@@ -129,7 +129,7 @@ class RetrievalAugmentationConfig:
         # Assign the created configurations to the instance
         self.tree_builder_config = tree_builder_config
         self.tree_retriever_config = tree_retriever_config
-        self.qa_model = qa_model or GPT3TurboQAModel()
+        self.qa_model = qa_model or GPT4oQAModel()
         self.tree_builder_type = tree_builder_type
 
     def log_config(self):
@@ -201,12 +201,14 @@ class RetrievalAugmentation:
             f"Successfully initialized RetrievalAugmentation with Config {config.log_config()}"
         )
 
-    def add_documents(self, docs):
+    def add_documents(self, docs, use_saved_leaf_nodes=False, leaf_node_file_path: str = "demo/sample_leaf_nodes.pkl"):
         """
         Adds documents to the tree and creates a TreeRetriever instance.
 
         Args:
             docs (str): The input text to add to the tree.
+            use_saved_leaf_nodes (bool): Whether to use saved leaf nodes. Defaults to False.
+            leaf_node_file_path (str): The path to the file containing the leaf nodes. Defaults to "demo/sample_leaf_nodes.pkl".
         """
         if self.tree is not None:
             user_input = input(
@@ -216,7 +218,7 @@ class RetrievalAugmentation:
                 # self.add_to_existing(docs)
                 return
 
-        self.tree = self.tree_builder.build_from_text(text=docs)
+        self.tree = self.tree_builder.build_from_text(text=docs, use_saved_leaf_nodes=use_saved_leaf_nodes, leaf_node_file_path=leaf_node_file_path)
         self.retriever = TreeRetriever(self.tree_retriever_config, self.tree)
 
     def retrieve(

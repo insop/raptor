@@ -1,7 +1,8 @@
 import logging
 import os
 
-from openai import OpenAI
+from dotenv import load_dotenv
+from openai import OpenAI, AzureOpenAI
 
 
 import getpass
@@ -163,6 +164,64 @@ class GPT4QAModel(BaseQAModel):
             print(e)
             return e
 
+class GPT4oQAModel(BaseQAModel):
+    def __init__(self, model="gpt-4o-dev"):
+        """
+        Initializes the GPT-4o model with the specified model version.
+
+        Args:
+            model (str, optional): The GPT-4o model version to use for generating answers. Defaults to "gpt-4o-dev".
+        """
+        load_dotenv()
+        self.model = model
+        self.deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+        self.client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            azure_deployment=self.deployment_name,
+        )
+
+
+    @retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(6))
+    def _attempt_answer_question(
+        self, context, question, max_tokens=150, stop_sequence=None
+    ):
+        """
+        Generates a summary of the given context using the GPT-3 model.
+
+        Args:
+            context (str): The text to summarize.
+            max_tokens (int, optional): The maximum number of tokens in the generated summary. Defaults to 150.
+            stop_sequence (str, optional): The sequence at which to stop summarization. Defaults to None.
+
+        Returns:
+            str: The generated summary.
+        """
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are Question Answering Portal"},
+                {
+                    "role": "user",
+                    "content": f"Given Context: {context} Give the best full answer amongst the option to question {question}",
+                },
+            ],
+            temperature=0,
+        )
+
+        return response.choices[0].message.content.strip()
+
+    @retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(6))
+    def answer_question(self, context, question, max_tokens=150, stop_sequence=None):
+
+        try:
+            return self._attempt_answer_question(
+                context, question, max_tokens=max_tokens, stop_sequence=stop_sequence
+            )
+        except Exception as e:
+            print(e)
+            return e
 
 class UnifiedQAModel(BaseQAModel):
     def __init__(self, model_name="allenai/unifiedqa-v2-t5-3b-1363200"):

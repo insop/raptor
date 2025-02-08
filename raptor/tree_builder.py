@@ -1,7 +1,8 @@
 import copy
 import logging
 import os
-from abc import abstractclassmethod
+import pickle
+from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import Dict, List, Optional, Set, Tuple
@@ -10,9 +11,10 @@ import openai
 import tiktoken
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-from .EmbeddingModels import BaseEmbeddingModel, OpenAIEmbeddingModel
+from .EmbeddingModels import BaseEmbeddingModel, OpenAIEmbeddingModel, AzureOpenAIEmbeddingModel
 from .SummarizationModels import (BaseSummarizationModel,
-                                  GPT3TurboSummarizationModel)
+                                  GPT3TurboSummarizationModel,
+                                  GPT4oSummarizationModel)
 from .tree_structures import Node, Tree
 from .utils import (distances_from_embeddings, get_children, get_embeddings,
                     get_node_list, get_text,
@@ -74,7 +76,7 @@ class TreeBuilderConfig:
         self.summarization_length = summarization_length
 
         if summarization_model is None:
-            summarization_model = GPT3TurboSummarizationModel()
+            summarization_model = GPT4oSummarizationModel()
         if not isinstance(summarization_model, BaseSummarizationModel):
             raise ValueError(
                 "summarization_model must be an instance of BaseSummarizationModel"
@@ -82,7 +84,7 @@ class TreeBuilderConfig:
         self.summarization_model = summarization_model
 
         if embedding_models is None:
-            embedding_models = {"OpenAI": OpenAIEmbeddingModel()}
+            embedding_models = {"OpenAI": AzureOpenAIEmbeddingModel()}
         if not isinstance(embedding_models, dict):
             raise ValueError(
                 "embedding_models must be a dictionary of model_name: instance pairs"
@@ -257,13 +259,17 @@ class TreeBuilder:
 
         return leaf_nodes
 
-    def build_from_text(self, text: str, use_multithreading: bool = True) -> Tree:
+    def build_from_text(self, text: str, use_multithreading: bool = True, use_saved_leaf_nodes: bool = False, leaf_node_file_path: str = "demo/sample_leaf_nodes.pkl") -> Tree:
         """Builds a golden tree from the input text, optionally using multithreading.
 
         Args:
             text (str): The input text.
             use_multithreading (bool, optional): Whether to use multithreading when creating leaf nodes.
                 Default: True.
+            use_saved_leaf_nodes (bool, optional): Whether to use saved leaf nodes.
+                Default: False.
+            leaf_node_file_path (str, optional): The path to the file containing the leaf nodes.
+                Default: "demo/sample_leaf_nodes.pkl".
 
         Returns:
             Tree: The golden tree structure.
@@ -272,13 +278,27 @@ class TreeBuilder:
 
         logging.info("Creating Leaf Nodes")
 
-        if use_multithreading:
-            leaf_nodes = self.multithreaded_create_leaf_nodes(chunks)
+        if use_saved_leaf_nodes:
+            logging.info("Loading Leaf Nodes from Saved File")
+            try:
+                with open(leaf_node_file_path, "rb") as f:
+                    leaf_nodes = pickle.load(f)
+            except FileNotFoundError:
+                logging.error("Saved Leaf Nodes File Not Found")
+                raise FileNotFoundError("Saved Leaf Nodes File Not Found")
         else:
-            leaf_nodes = {}
-            for index, text in enumerate(chunks):
-                __, node = self.create_node(index, text)
-                leaf_nodes[index] = node
+            logging.info("Creating Leaf Nodes from Text")
+            if use_multithreading:
+                leaf_nodes = self.multithreaded_create_leaf_nodes(chunks)
+            else:
+                leaf_nodes = {}
+                for index, text in enumerate(chunks):
+                    __, node = self.create_node(index, text)
+                    leaf_nodes[index] = node
+
+            with open(leaf_node_file_path, "wb") as f:
+                pickle.dump(leaf_nodes, f)
+            logging.info(f"Saved Leaf Nodes to File: {leaf_node_file_path}")
 
         layer_to_nodes = {0: list(leaf_nodes.values())}
 
@@ -294,7 +314,7 @@ class TreeBuilder:
 
         return tree
 
-    @abstractclassmethod
+    @abstractmethod
     def construct_tree(
         self,
         current_level_nodes: Dict[int, Node],
