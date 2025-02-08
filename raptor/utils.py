@@ -7,6 +7,7 @@ import tiktoken
 from scipy import spatial
 
 from .tree_structures import Node
+from .tree_structures import Tree
 
 logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 
@@ -206,3 +207,27 @@ def indices_of_nearest_neighbors_from_distances(distances: List[float]) -> np.nd
         np.ndarray: An array of indices sorted by ascending distance.
     """
     return np.argsort(distances)
+
+
+def inspect_tree(tree):
+    """
+    Inspects the tree structure and prints out its details.
+
+    Args:
+        tree (Tree): The tree instance to inspect.
+    """
+    if not isinstance(tree, Tree):
+        raise ValueError("The provided object is not an instance of Tree")
+
+    print("Tree Inspection:")
+    print(f"Number of layers: {tree.num_layers}")
+    print(f"Number of root nodes: {len(tree.root_nodes)}")
+    print(f"Number of leaf nodes: {len(tree.leaf_nodes)}")
+    print("Layer to nodes mapping:")
+    for layer, nodes in tree.layer_to_nodes.items():
+        print(f"  Layer {layer}: {len(nodes)} nodes")
+    
+    for layer, nodes in tree.layer_to_nodes.items():
+        print(f"Layer {layer}:")
+        for node in nodes:
+            print(f"  Node {node.index}: {node.text} (Children: {node.children})")
