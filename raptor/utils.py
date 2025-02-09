@@ -36,12 +36,17 @@ def split_text(
         List[str]: A list of text chunks.
     """
     # Split the text into sentences using multiple delimiters
+    # ISS_CODE
+    # delimiters = ["\n"]
     delimiters = [".", "!", "?", "\n"]
     regex_pattern = "|".join(map(re.escape, delimiters))
     sentences = re.split(regex_pattern, text)
     
     # Calculate the number of tokens for each sentence
-    n_tokens = [len(tokenizer.encode(" " + sentence)) for sentence in sentences]
+    # n_tokens = [len(tokenizer.encode(" " + sentence, disallowed_special=(enc.special_tokens_set - {'<|endoftext|>', '<|fim_prefix|>', '<|fim_middle|>', '<|fim_suffix|>'}))) for sentence in sentences]
+    # n_tokens = [len(tokenizer.encode(" " + sentence, allowed_special={'<|endoftext|>', '<|fim_prefix|>', '<|fim_middle|>', '<|fim_suffix|>'})) for sentence in sentences]
+    # n_tokens = [len(tokenizer.encode(" " + sentence, allowed_special={'<|endoftext|>', '<|fim_prefix|>', '<|fim_middle|>', '<|fim_suffix|>','<|endofprompt|>'})) for sentence in sentences]
+    n_tokens = [len(tokenizer.encode(" " + sentence, disallowed_special=())) for sentence in sentences]
     
     chunks = []
     current_chunk = []
@@ -60,7 +65,7 @@ def split_text(
             # since spaces will be inserted in the beginning of the full string
             # and in between the string in the sub_chuk list
             filtered_sub_sentences = [sub.strip() for sub in sub_sentences if sub.strip() != ""]
-            sub_token_counts = [len(tokenizer.encode(" " + sub_sentence)) for sub_sentence in filtered_sub_sentences]
+            sub_token_counts = [len(tokenizer.encode(" " + sub_sentence, disallowed_special=())) for sub_sentence in filtered_sub_sentences]
             
             sub_chunk = []
             sub_length = 0
@@ -71,6 +76,8 @@ def split_text(
                     # if the phrase does not have sub_sentences, it would create an empty chunk
                     # this big phrase would be added anyways in the next chunk append
                     if sub_chunk:
+                        # ISS_CODE
+                        # chunks.append("\n".join(sub_chunk))
                         chunks.append(" ".join(sub_chunk))
                         sub_chunk = sub_chunk[-overlap:] if overlap > 0 else []
                         sub_length = sum(sub_token_counts[max(0, len(sub_chunk) - overlap):len(sub_chunk)])
@@ -79,10 +86,14 @@ def split_text(
                 sub_length += sub_token_count
             
             if sub_chunk:
+                # ISS_CODE
+                # chunks.append("\n".join(sub_chunk))
                 chunks.append(" ".join(sub_chunk))
         
         # If adding the sentence to the current chunk exceeds the max tokens, start a new chunk
         elif current_length + token_count > max_tokens:
+            # ISS_CODE
+            # chunks.append("\n".join(current_chunk))
             chunks.append(" ".join(current_chunk))
             current_chunk = current_chunk[-overlap:] if overlap > 0 else []
             current_length = sum(n_tokens[max(0, len(current_chunk) - overlap):len(current_chunk)])
@@ -96,6 +107,8 @@ def split_text(
     
     # Add the last chunk if it's not empty
     if current_chunk:
+        # ISS_CODE
+        # chunks.append("\n".join(current_chunk))
         chunks.append(" ".join(current_chunk))
     
     return chunks

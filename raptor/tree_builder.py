@@ -277,6 +277,7 @@ class TreeBuilder:
         chunks = split_text(text, self.tokenizer, self.max_tokens)
 
         logging.info("Creating Leaf Nodes")
+        import pdb; pdb.set_trace()
 
         if use_saved_leaf_nodes:
             logging.info("Loading Leaf Nodes from Saved File")
